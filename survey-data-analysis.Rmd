@@ -1,0 +1,114 @@
+---
+title: "survey-data-analysis"
+author: "rongxin"
+date: "2025-04-19"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r setup}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(corrplot)
+
+options(scipen = 999)
+
+data <- read.csv("../data/survey_data.csv")
+
+likert_to_numeric <- function(x) {
+  recode(as.character(x),
+         "Strongly disagree" = 1,
+         "Disagree" = 2,
+         "Neutral" = 3,
+         "Agree" = 4,
+         "Strongly agree" = 5)
+}
+
+data_clean <- data %>%
+  mutate(across(
+    c(6:22),  
+    ~ likert_to_numeric(.)
+  ))
+
+data_clean[[7]] <- 6 - data_clean[[7]]
+
+data_clean <- data_clean %>%
+  mutate(
+    family_support = rowMeans(select(., 6:10), na.rm = TRUE),
+    sociocultural_adaptation = rowMeans(select(., 11:15), na.rm = TRUE),
+    visa_perception = rowMeans(select(., 16:19), na.rm = TRUE),
+    intention_to_stay = rowMeans(select(., 20:22), na.rm = TRUE)
+  )
+
+```
+
+```{r correlation-plot}
+cor_matrix <- cor(
+  select(data_clean, family_support, sociocultural_adaptation, visa_perception, intention_to_stay),
+  use = "complete.obs"
+)
+
+round(cor_matrix, 2)
+
+corrplot(cor_matrix, method = "color", addCoef.col = "black",
+         tl.col = "black", tl.srt = 45, number.cex = 0.8,
+         title = "Correlation Matrix", mar = c(0,0,1,0))
+
+```
+
+```{r pearson}
+# Pearson correlation between family_support and intention_to_stay
+cor.test(data_clean$family_support, data_clean$intention_to_stay, method = "pearson")
+
+# Pearson correlation between sociocultural_adaptation and intention_to_stay
+cor.test(data_clean$sociocultural_adaptation, data_clean$intention_to_stay, method = "pearson")
+
+# Pearson correlation between visa_perception and intention_to_stay
+cor.test(data_clean$visa_perception, data_clean$intention_to_stay, method = "pearson")
+```
+
+```{r }
+model <- lm(intention_to_stay ~ family_support + sociocultural_adaptation + visa_perception, data = data_clean)
+summary(model)
+```
+
+```{r }
+model_reduced <- lm(intention_to_stay ~ sociocultural_adaptation + visa_perception, data = data_clean)
+summary(model_reduced)
+```
+
+```
+ggplot(data = data.frame(fitted = fitted(model), residuals = resid(model)), aes(x = fitted, y = residuals)) +
+  geom_point(alpha = 0.6) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs Fitted Values", x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+
+```
+
