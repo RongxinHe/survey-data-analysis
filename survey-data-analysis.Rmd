@@ -42,19 +42,19 @@ options(scipen = 999)
 data <- read.csv("../data/survey_data.csv")
 
 likert_to_numeric <- function(x) {
-  recode(as.character(x),
-         "Strongly disagree" = 1,
-         "Disagree" = 2,
-         "Neutral" = 3,
-         "Agree" = 4,
-         "Strongly agree" = 5)
+  x <- as.character(x)
+  case_when(
+    x == "Strongly disagree" ~ 1,
+    x == "Disagree" ~ 2,
+    x == "Neutral" ~ 3,
+    x == "Agree" ~ 4,
+    x == "Strongly agree" ~ 5,
+    TRUE ~ NA_real_
+  )
 }
 
 data_clean <- data %>%
-  mutate(across(
-    c(6:22),  
-    ~ likert_to_numeric(.)
-  ))
+  mutate(across(6:22, likert_to_numeric))
 
 data_clean[[7]] <- 6 - data_clean[[7]]
 
@@ -65,6 +65,222 @@ data_clean <- data_clean %>%
     visa_perception = rowMeans(select(., 16:19), na.rm = TRUE),
     intention_to_stay = rowMeans(select(., 20:22), na.rm = TRUE)
   )
+
+data_clean <- data_clean %>%
+  rename(
+    gender = 2,
+    age = 3,
+    level_study = 4,
+    years_in_uk = 5
+  )
+```
+
+# Descriptive statistics
+```{r visualise-gender, echo=FALSE}
+data_clean %>%
+  ggplot(aes(x = gender)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Gender Distribution", x = "Gender", y = "Count") +
+  theme_minimal()
+```
+
+```{r visualise-age, echo=FALSE}
+data_clean %>%
+  ggplot(aes(x = age)) +
+  geom_bar(fill = "lightblue") +
+  labs(title = "Age Group Distribution", x = "Age", y = "Count") +
+  theme_minimal()
+```
+
+```{r visualise-level-study, echo=FALSE}
+ggplot(data_clean, aes(x = level_study)) +
+  geom_bar(fill = "coral") +
+  labs(title = "Level of Study", x = "Study Level", y = "Count") +
+  theme_minimal()
+```
+
+```{r visualise-years-in-uk, echo=FALSE}
+ggplot(data_clean, aes(x = years_in_uk)) +
+  geom_bar(fill = "plum") +
+  labs(title = "Years in the UK", x = "Years", y = "Count") +
+  theme_minimal()
+```
+
+# Hypotheses
+H1: The degree of family support is correlated with Chinese international students’ intention to work in the UK.
+
+H2: The degree of sociocultural adaptation is correlated with Chinese international students’ intention to work in the UK.
+
+H3: The perception of UK visa difficulty is correlated with Chinese international students’ intention to work in the UK.
+
+# Findings
+##family support vs intention to work in the UK
+```{r family support vs intention to work in the UK}
+data_clean %>%
+  ggplot(aes(x = family_support, y = intention_to_stay)) +
+  geom_jitter(width = 0.2, height = 0.2, color = "darkblue") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "Relationship between Family Support and Intention to Stay",
+    x = "Family Support",
+    y = "Intention to Stay in the UK"
+  ) +
+  theme_minimal()
+```
+
+```{r support-intention-correlation, echo=FALSE}
+cor.test(
+  ~ family_support + intention_to_stay,
+  data = data_clean,
+  method = "pearson"
+)
+```
+
+In the sample, there is not a statistically significant correlation between family support and intention to stay, r(81) =, 95% CI [, ], p < .
+
+##sociocultural adaptation vs intention to work in the UK
+```{r sociocultural adaptation vs intention to work in the UK, echo=FALSE}
+data_clean %>%
+  ggplot(aes(x = sociocultural_adaptation, y = intention_to_stay)) +
+  geom_jitter(width = 0.2, height = 0.2, color = "darkgreen") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "Relationship between Sociocultural Adaptation and Intention to Stay",
+    x = "Sociocultural Adaptation",
+    y = "Intention to Stay in the UK"
+  ) +
+  theme_minimal()
+```
+
+```{r adaptation-intention-correlation, echo=FALSE}
+cor.test(
+  ~ sociocultural_adaptation + intention_to_stay,
+  data = data_clean,
+  method = "pearson"
+)
+```
+
+##visa perception vs intention to work in the UK
+```{r visa perception vs intention to work in the UK, echo=FALSE}
+data_clean %>%
+  ggplot(aes(x = visa_perception, y = intention_to_stay)) +
+  geom_jitter(width = 0.2, height = 0.2, color = "darkorange") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "Relationship between Visa Perception and Intention to Stay",
+    x = "Visa Perception",
+    y = "Intention to Stay in the UK"
+  ) +
+  theme_minimal()
+```
+
+
+```{r visa-intention-correlation, echo=FALSE}
+cor.test(
+  ~ visa_perception + intention_to_stay,
+  data = data_clean,
+  method = "pearson"
+)
+```
+
+## Linear model
+```{r model-family-support, echo=FALSE}
+data_clean %>%
+  lm(
+    intention_to_stay ~ family_support,
+    data = .
+  ) %>%
+  summary()
+```
+
+```{r model-sociocultural_adaptation, echo=FALSE}
+data_clean %>%
+  lm(
+    intention_to_stay ~ sociocultural_adaptation,
+    data = .
+  ) %>%
+  summary()
+```
+
+```{r model-visa_perception, echo=FALSE}
+data_clean %>%
+  lm(
+    intention_to_stay ~ visa_perception,
+    data = .
+  ) %>%
+  summary()
+```
+
+```{r model-full-multiple, echo=FALSE}
+model_full <- data_clean %>%
+  lm(
+    intention_to_stay ~ family_support + sociocultural_adaptation + visa_perception,
+    data = .
+  )
+
+model_full %>% summary()
+```
+
+
+
+
+```{r }
+library(psych)
+
+efa_data <- data_clean[, 6:19]
+
+KMO(efa_data)
+
+cortest.bartlett(cor(efa_data), n = nrow(efa_data))
+
+efa_result <- fa(efa_data, nfactors = 3, rotate = "oblimin", fm = "ml")
+print(efa_result$loadings, cutoff = 0.3)
+
+fa.diagram(efa_result)
+```
+
+```{r pearson}
+# Pearson correlation between family_support and intention_to_stay
+cor.test(data_clean$family_support, data_clean$intention_to_stay, method = "pearson")
+
+# Pearson correlation between sociocultural_adaptation and intention_to_stay
+cor.test(data_clean$sociocultural_adaptation, data_clean$intention_to_stay, method = "pearson")
+
+# Pearson correlation between visa_perception and intention_to_stay
+cor.test(data_clean$visa_perception, data_clean$intention_to_stay, method = "pearson")
+```
+
+```{r }
+model <- lm(intention_to_stay ~ family_support + sociocultural_adaptation + visa_perception, data = data_clean)
+summary(model)
+```
+
+```{r }
+# Step 1: 重新计算三个量表，剔除第7题（家庭支持里只用 Q6, Q8, Q9, Q10）
+data_clean <- data_clean %>%
+  mutate(
+    fs_revised = rowMeans(select(., 6, 8, 9, 10), na.rm = TRUE),        # family_support (Q6, Q8–Q10)
+    sca_revised = rowMeans(select(., 11:15), na.rm = TRUE),             # sociocultural_adaptation
+    visa_revised = rowMeans(select(., 16:19), na.rm = TRUE)             # visa_perception
+  )
+
+# Step 2: Pearson correlation with intention_to_stay
+cor.test(data_clean$fs_revised, data_clean$intention_to_stay, method = "pearson")
+cor.test(data_clean$sca_revised, data_clean$intention_to_stay, method = "pearson")
+cor.test(data_clean$visa_revised, data_clean$intention_to_stay, method = "pearson")
+
+
+library(ggplot2)
+
+ggplot(data_clean, aes(x = family_support, y = intention_to_stay)) +
+  geom_point(alpha = 0.6) +  # 散点图，透明度 0.6
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +  # 加回归线
+  labs(
+    title = "Correlation between Family Support and Intention to Stay",
+    x = "Family Support (Mean Score)",
+    y = "Intention to Stay (Mean Score)"
+  ) +
+  theme_minimal()
 
 ```
 
@@ -101,9 +317,7 @@ summary(model)
 ```{r }
 model_reduced <- lm(intention_to_stay ~ sociocultural_adaptation + visa_perception, data = data_clean)
 summary(model_reduced)
-```
 
-```
 ggplot(data = data.frame(fitted = fitted(model), residuals = resid(model)), aes(x = fitted, y = residuals)) +
   geom_point(alpha = 0.6) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
@@ -112,3 +326,17 @@ ggplot(data = data.frame(fitted = fitted(model), residuals = resid(model)), aes(
 
 ```
 
+```{r }
+library(psych)
+
+efa_data <- data_clean[, 6:19]
+
+KMO(efa_data)
+
+cortest.bartlett(cor(efa_data), n = nrow(efa_data))
+
+efa_result <- fa(efa_data, nfactors = 3, rotate = "oblimin", fm = "ml")
+print(efa_result$loadings, cutoff = 0.3)
+
+fa.diagram(efa_result)
+```
